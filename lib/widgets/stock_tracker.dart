@@ -5,6 +5,7 @@ import '../models/stock_state.dart';
 import '../services/websocket_service.dart';
 import 'connection_status_bar.dart';
 import 'optimized_stock_list.dart';
+import 'shimmer_loading.dart';
 
 class StockTracker extends StatefulWidget {
   const StockTracker({super.key});
@@ -26,7 +27,7 @@ class _StockTrackerState extends State<StockTracker> {
     _webSocketService ??= WebSocketService();
     _stockState ??= StockState();
     
-    // Connect to WebSocket if not already connected
+    // Connect to WebSocket immediately
     _webSocketService!.connect();
     
     // Listen to data updates
@@ -77,9 +78,52 @@ class _StockTrackerState extends State<StockTracker> {
                 child: Consumer<StockState>(
                   builder: (context, stockState, child) {
                     final stocks = stockState.stocks.values.toList();
-                    return OptimizedStockList(
-                      stocks: stocks,
-                      isLoading: stockState.isLoading,
+                    return Consumer<ConnectionStatus>(
+                      builder: (context, connectionStatus, child) {
+                        // Show waiting message when disconnected
+                        if (connectionStatus == ConnectionStatus.disconnected) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.wifi_off,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Waiting for connection...',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Please ensure the mock server is running',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        
+                        // Show shimmer loading when connecting
+                        if (connectionStatus == ConnectionStatus.connecting || 
+                            connectionStatus == ConnectionStatus.reconnecting) {
+                          return const ShimmerLoading();
+                        }
+                        
+                        // Show stock data when connected
+                        return OptimizedStockList(
+                          stocks: stocks,
+                          isLoading: stockState.isLoading,
+                        );
+                      },
                     );
                   },
                 ),

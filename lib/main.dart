@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'widgets/stock_tracker.dart';
+import 'config/app_config.dart';
 
 void main() {
+  // Print configuration for debugging
+  AppConfig.printConfig();
+  
   runApp(const MyApp());
 }
 

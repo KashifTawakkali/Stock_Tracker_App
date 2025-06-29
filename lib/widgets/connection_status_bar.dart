@@ -79,13 +79,13 @@ class ConnectionStatusBar extends StatelessWidget {
   String _getStatusText(ConnectionStatus status) {
     switch (status) {
       case ConnectionStatus.connected:
-        return 'Connected';
+        return 'Connected - Live Data';
       case ConnectionStatus.connecting:
         return 'Connecting...';
       case ConnectionStatus.reconnecting:
         return 'Reconnecting...';
       case ConnectionStatus.disconnected:
-        return 'Disconnected';
+        return 'Disconnected - Check Server';
     }
   }
 } 

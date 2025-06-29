@@ -257,3 +257,230 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Support
 
 For support, email [your-email] or create an issue in the repository.
+
+## Cross-Device Configuration
+
+This app is designed to work across different devices and environments. The WebSocket URL is configurable to handle various scenarios:
+
+### Default Configuration
+By default, the app uses `ws://localhost:8080/ws` which works for:
+- ✅ iOS Simulator
+- ✅ Android Emulator (with proper network setup)
+- ✅ Web browsers
+
+### For Physical Devices (USB Debugging)
+
+When running on physical devices via USB debugging, you need to specify your development machine's IP address:
+
+#### Option 1: Environment Variable (Recommended)
+```bash
+# Run with custom WebSocket URL
+flutter run --dart-define=WEBSOCKET_URL=ws://192.168.1.100:8080/ws
+```
+
+#### Option 2: Build Configuration
+```bash
+# For iOS
+flutter run --dart-define=BUILD_WEBSOCKET_URL=ws://192.168.1.100:8080/ws
+
+# For Android
+flutter run --dart-define=BUILD_WEBSOCKET_URL=ws://192.168.1.100:8080/ws
+```
+
+#### Option 3: Code Configuration
+Edit `lib/config/app_config.dart` and modify the `_defaultWsUrl`:
+```dart
+static const String _defaultWsUrl = 'ws://192.168.1.100:8080/ws';
+```
+
+### Finding Your IP Address
+
+#### On macOS/Linux:
+```bash
+ifconfig | grep "inet " | grep -v 127.0.0.1
+```
+
+#### On Windows:
+```bash
+ipconfig | findstr "IPv4"
+```
+
+### Configuration Examples
+
+| Device/Environment | WebSocket URL | Command |
+|-------------------|---------------|---------|
+| iOS Simulator | `ws://localhost:8080/ws` | `flutter run` |
+| Android Emulator | `ws://10.0.2.2:8080/ws` | `flutter run --dart-define=WEBSOCKET_URL=ws://10.0.2.2:8080/ws` |
+| Physical iOS Device | `ws://192.168.1.100:8080/ws` | `flutter run --dart-define=WEBSOCKET_URL=ws://192.168.1.100:8080/ws` |
+| Physical Android Device | `ws://192.168.1.100:8080/ws` | `flutter run --dart-define=WEBSOCKET_URL=ws://192.168.1.100:8080/ws` |
+
+## Setup
+
+### Prerequisites
+- Flutter SDK (3.0 or higher)
+- Dart SDK
+- iOS Simulator or Android Emulator (for testing)
+- Physical device (optional, for real-world testing)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd stock_price_tracker
+   ```
+
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Start the mock server**
+   ```bash
+   dart run mock_server.dart
+   ```
+
+4. **Run the app**
+   ```bash
+   # For iOS Simulator
+   flutter run
+   
+   # For physical device (replace with your IP)
+   flutter run --dart-define=WEBSOCKET_URL=ws://192.168.1.100:8080/ws
+   ```
+
+## Architecture
+
+### State Management
+- **Provider Pattern**: Centralized state management with `StockState`
+- **Stream-based Updates**: Real-time data flow from WebSocket to UI
+- **Optimistic Updates**: UI updates immediately, with rollback on errors
+
+### Network Layer
+- **WebSocket Service**: Handles connection, reconnection, and data parsing
+- **Exponential Backoff**: Intelligent reconnection strategy
+- **Heartbeat Mechanism**: Keeps connections alive
+- **Error Handling**: Graceful degradation on network issues
+
+### Data Processing
+- **Anomaly Detection**: Statistical analysis for price validation
+- **Data Validation**: Multi-layer validation (basic + advanced)
+- **Debouncing**: Prevents UI spam from rapid updates
+
+### UI Components
+- **Glassmorphism Design**: Modern, translucent UI elements
+- **Animated Lists**: Smooth scrolling with optimized rendering
+- **Loading States**: Shimmer effects and connection status indicators
+- **Responsive Layout**: Adapts to different screen sizes
+
+## Performance Features
+
+### UI Optimizations
+- **Lazy Loading**: Only renders visible items
+- **Debounced Updates**: Prevents excessive rebuilds
+- **Optimized Animations**: Hardware-accelerated animations
+- **Memory Management**: Proper disposal of resources
+
+### Network Optimizations
+- **Connection Pooling**: Efficient WebSocket management
+- **Data Compression**: Minimal payload sizes
+- **Batch Updates**: Grouped data transmission
+- **Timeout Handling**: Prevents hanging connections
+
+## Anomaly Detection
+
+The app implements sophisticated anomaly detection using:
+
+### Statistical Methods
+- **Z-Score Analysis**: Detects outliers based on standard deviation
+- **Moving Averages**: Smooths out noise in price data
+- **Threshold Validation**: Multiple validation layers
+
+### Heuristics
+- **Price Range Validation**: Ensures prices are within reasonable bounds
+- **Change Rate Limits**: Prevents unrealistic price jumps
+- **Historical Comparison**: Compares against previous values
+
+## Error Handling
+
+### Network Errors
+- **Connection Failures**: Automatic retry with exponential backoff
+- **Timeout Handling**: Configurable timeouts for different operations
+- **Graceful Degradation**: App continues working with cached data
+
+### Data Errors
+- **Malformed JSON**: Robust parsing with fallbacks
+- **Invalid Data**: Validation and filtering of corrupted data
+- **Missing Fields**: Default value handling
+
+## Testing
+
+### Unit Tests
+```bash
+flutter test
+```
+
+### Widget Tests
+```bash
+flutter test test/widget_test.dart
+```
+
+### Integration Tests
+```bash
+flutter test integration_test/
+```
+
+## Deployment
+
+### iOS
+```bash
+flutter build ios
+```
+
+### Android
+```bash
+flutter build apk
+```
+
+### Web
+```bash
+flutter build web
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Troubleshooting
+
+### Common Issues
+
+#### Connection Refused
+- Ensure the mock server is running: `dart run mock_server.dart`
+- Check if the port 8080 is available
+- Verify the WebSocket URL configuration
+
+#### No Data Displayed
+- Check the console for connection logs
+- Verify the mock server is sending data
+- Ensure the device can reach the server IP
+
+#### Performance Issues
+- Check for memory leaks in the console
+- Verify the device has sufficient resources
+- Consider reducing the update frequency
+
+### Debug Mode
+The app prints detailed configuration information on startup. Check the console for:
+- WebSocket URL being used
+- Server host and port
+- Connection status updates
+- Anomaly detection logs

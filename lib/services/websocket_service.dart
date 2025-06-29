@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/stock_data.dart';
+import '../config/app_config.dart';
 
 enum ConnectionStatus {
   connecting,
@@ -12,12 +14,15 @@ enum ConnectionStatus {
 }
 
 class WebSocketService {
-  // Use 10.0.2.2 for Android emulator, localhost for iOS simulator/desktop, or your Mac's IP for physical devices
-  static const String _wsUrl = 'ws://192.168.23.149:8080/ws';
-  // static const String _wsUrl = 'ws://localhost:8080/ws';
-  // static const String _wsUrl = 'ws://10.0.2.2:8080/ws'; // For Android emulator
+  // Dynamic WebSocket URL that works across different devices
+  static String get _wsUrl => AppConfig.webSocketUrl;
+  
+  // Fallback URLs for different scenarios
+  static const String _localhostUrl = 'ws://localhost:8080/ws';
+  static const String _androidEmulatorUrl = 'ws://10.0.2.2:8080/ws';
+  
   static const int _maxReconnectDelay = 30; // seconds
-  static const int _initialReconnectDelay = 2; // seconds
+  static const int _initialReconnectDelay = 1; // seconds - reduced from 2 to 1
   
   WebSocketChannel? _channel;
   StreamController<List<StockData>>? _dataController;
@@ -38,6 +43,8 @@ class WebSocketService {
   WebSocketService() {
     _dataController = StreamController<List<StockData>>.broadcast();
     _statusController = StreamController<ConnectionStatus>.broadcast();
+    // Start connecting immediately when service is created
+    _updateStatus(ConnectionStatus.connecting);
   }
   
   void connect() {
@@ -47,7 +54,19 @@ class WebSocketService {
     
     try {
       print('Attempting to connect to $_wsUrl');
+      print('Device type: ${Platform.isIOS ? 'iOS' : Platform.isAndroid ? 'Android' : 'Other'}');
+      
       _channel = WebSocketChannel.connect(Uri.parse(_wsUrl));
+      
+      // Add connection timeout - longer for physical devices
+      final timeoutDuration = Platform.isIOS || Platform.isAndroid ? 5 : 3;
+      Timer(Duration(seconds: timeoutDuration), () {
+        if (_isConnecting && !_isDisposed) {
+          print('Connection timeout after ${timeoutDuration}s, retrying...');
+          _isConnecting = false;
+          _handleDisconnection();
+        }
+      });
       
       _streamSubscription = _channel!.stream.listen(
         _handleMessage,
@@ -100,17 +119,24 @@ class WebSocketService {
       final String messageStr = message.toString();
       print('Received message: $messageStr');
       
-      // Handle heartbeat messages
+      // Handle heartbeat messages first
       if (messageStr.contains('"type":"heartbeat"') || messageStr.contains('"type":"ping"')) {
         print('Received heartbeat/ping, sending pong');
         if (!_isDisposed && _channel != null) {
           _channel!.sink.add('{"type": "pong", "timestamp": "${DateTime.now().toIso8601String()}"}');
         }
+        return; // Exit early, don't try to parse as stock data
+      }
+      
+      // Try to parse as JSON array (stock data)
+      final dynamic jsonData = jsonDecode(messageStr);
+      
+      // Check if it's a list (stock data) or object (other message types)
+      if (jsonData is! List) {
+        print('Received non-array message, ignoring: $messageStr');
         return;
       }
       
-      // Try to parse as JSON
-      final List<dynamic> jsonData = jsonDecode(messageStr);
       final List<StockData> stockDataList = jsonData
           .map((json) => StockData.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -172,6 +198,17 @@ class WebSocketService {
     if (_isDisposed) return;
     
     print('WebSocket error: $error');
+    print('Error type: ${error.runtimeType}');
+    
+    // Provide more specific error information for debugging
+    if (error.toString().contains('Connection refused')) {
+      print('Connection refused - check if server is running on $_wsUrl');
+    } else if (error.toString().contains('Network is unreachable')) {
+      print('Network unreachable - check device network connection');
+    } else if (error.toString().contains('timeout')) {
+      print('Connection timeout - server may be slow to respond');
+    }
+    
     _handleDisconnection();
   }
   
@@ -180,13 +217,21 @@ class WebSocketService {
     
     _updateStatus(ConnectionStatus.reconnecting);
     
-    _reconnectTimer = Timer(Duration(seconds: _currentReconnectDelay), () {
+    // More aggressive retry for physical devices
+    final isPhysicalDevice = Platform.isIOS || Platform.isAndroid;
+    final baseDelay = isPhysicalDevice ? 0 : _currentReconnectDelay;
+    final delay = baseDelay <= 2 ? 0 : baseDelay;
+    
+    print('Scheduling reconnect in ${delay}s (attempt ${_currentReconnectDelay})');
+    
+    _reconnectTimer = Timer(Duration(seconds: delay), () {
       if (!_isDisposed) {
         print('Attempting to reconnect...');
         connect();
         
-        // Exponential backoff with cap
-        _currentReconnectDelay = min(_currentReconnectDelay * 2, _maxReconnectDelay);
+        // Exponential backoff with cap, but start with shorter delays for physical devices
+        final multiplier = isPhysicalDevice ? 1.2 : 1.5;
+        _currentReconnectDelay = min((_currentReconnectDelay * multiplier).round(), _maxReconnectDelay);
       }
     });
   }
